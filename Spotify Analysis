@@ -1,0 +1,66 @@
+package OmriPlayGround
+
+import org.apache.log4j._
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.functions.{round, sum}
+import org.apache.spark.sql.functions._
+
+
+
+/** Compute the total amount spent per customer in some fake e-commerce data. */
+object SpotifyReviews {
+
+  case class SpotifyAnalysis(Time_submitted: String, Review: String, Rating: String, Total_thumbsup: String, Reply: String)
+
+  /** Our main function where the action happens */
+  def main(args: Array[String]) {
+   
+    // Set the log level to only print errors
+    Logger.getLogger("org").setLevel(Level.ERROR)
+
+    val spark = SparkSession
+      .builder
+      .appName("SpotifyReviewsAnalysis")
+      .master("local[*]")
+      .getOrCreate()
+
+    // Load each line of the source data into an Dataset
+    import spark.implicits._
+    val schemaSpotify = spark.read
+      .option("header", "true")
+      .option("inferSchema", "true")
+      .csv("data/SportifyReviews.csv")
+      .as[SpotifyAnalysis]
+
+    val totalByDate = schemaSpotify
+      .groupBy("Time_submitted")
+      .agg(round(sum("Total_thumbsup"), 2)
+        .alias("total_likes"))
+
+    val totalByDateSorted = totalByDate.sort("total_likes")
+
+    totalByDateSorted.show(totalByDate.count.toInt)
+
+
+    // ReviewsWordCount
+    // Split using a regular expression that extracts words
+    val words = schemaSpotify
+      .select(explode(split($"Review", "\\W+")).alias("word"))
+      .filter($"word" =!= "")
+
+    // Normalize everything to lowercase
+    val lowercaseWords = words.select(lower($"word").alias("word"))
+
+    // Count up the occurrences of each word
+    val wordCounts = lowercaseWords.groupBy("word").count()
+
+    // Sort by counts
+    val wordCountsSorted = wordCounts.sort(desc("count"))
+
+    // Show the results.
+    wordCountsSorted.show(wordCountsSorted.count.toInt)
+
+  }
+  
+}
+
