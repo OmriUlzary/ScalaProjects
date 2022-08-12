@@ -34,12 +34,23 @@ object SpotifyReviews {
 
     val totalByDate = schemaSpotify
       .groupBy("Time_submitted")
-      .agg(round(sum("Total_thumbsup"), 2)
+      .agg(sum("Total_thumbsup")
         .alias("total_likes"))
 
     val totalByDateSorted = totalByDate.sort("total_likes")
 
+    println("Total likes by date: ")
     totalByDateSorted.show(totalByDate.count.toInt)
+
+    val AvgByDate = schemaSpotify
+      .groupBy("Time_submitted")
+      .agg(round(avg("Rating"), 2)
+        .alias("Rating_AVG"))
+
+    val AvgByDateSorted = AvgByDate.sort(desc("Rating_AVG"))
+
+    println("Rating average by date: ")
+    AvgByDateSorted.show(AvgByDate.count.toInt)
 
 
     // ReviewsWordCount
@@ -58,6 +69,7 @@ object SpotifyReviews {
     val wordCountsSorted = wordCounts.sort(desc("count"))
 
     // Show the results.
+    println("Words appearances:")
     wordCountsSorted.show(wordCountsSorted.count.toInt)
 
   }
