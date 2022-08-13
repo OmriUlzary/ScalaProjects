@@ -1,17 +1,30 @@
 package OmriPlayGround
 
 import org.apache.log4j._
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{DataFrame, Dataset, SparkSession, functions}
 import org.apache.spark.sql.functions._
-import org.apache.spark.sql.functions;
 import org.apache.spark.ml.regression.DecisionTreeRegressor
 import org.apache.spark.ml.feature.VectorAssembler
-import org.apache.spark.sql.types._
 
 /** Compute the total amount spent per customer in some fake e-commerce data. */
 object SpotifyReviews {
 
   case class SpotifyAnalysis(Time_submitted: String, Review: String, Rating: String, Total_thumbsup: String, Reply: String)
+
+  // Get movie name by given dataset and id
+  def AddMonthAndYearCols(schemaSpotify: Dataset[SpotifyAnalysis]): DataFrame = {
+
+    val AddMonthAndYear = schemaSpotify.select( col("Time_submitted"))
+
+    val NewDF = AddMonthAndYear.toDF("input")
+      .select( col("input"),
+        month(col("input")).as("month"),
+        year(col("input")).as("year")
+      )
+
+    val NewSchema = NewDF.withColumn("Rating",functions.lit(1))
+    NewSchema
+  }
 
   /** Our main function where the action happens */
   def main(args: Array[String]) {
@@ -38,21 +51,31 @@ object SpotifyReviews {
       .agg(sum("Total_thumbsup")
         .alias("total_likes"))
 
-    val totalByDateSorted = totalByDate.sort("total_likes")
+    val totalByDateSorted = totalByDate.sort(desc("total_likes"))
 
     println("Total likes by date: ")
     totalByDateSorted.show(totalByDate.count.toInt)
 
-    val AvgByDate = schemaSpotify
-      .groupBy("Time_submitted")
-      .agg(round(avg("Rating"), 2)
+    // Add Month and Year columns
+    val MonthAndYearSchema = AddMonthAndYearCols(schemaSpotify: Dataset[SpotifyAnalysis])
+
+    val AvgByMonth = MonthAndYearSchema
+      .groupBy("Month")
+      .agg(avg("Rating")
         .alias("Rating_AVG"))
 
-    val AvgByDateSorted = AvgByDate.sort(desc("Rating_AVG"))
+    println("Rating average by Month: ")
+    AvgByMonth.sort(asc("Month")).show()
 
-    println("Rating average by date: ")
-    AvgByDateSorted.show(AvgByDate.count.toInt)
+    val AvgByYear = MonthAndYearSchema
+      .groupBy("Year")
+      .agg(avg("Rating")
+        .alias("Rating_AVG"))
 
+    val AvgByYearSorted = AvgByYear.sort(desc("Year"))
+
+    println("Rating average by Year: ")
+    AvgByYearSorted.show(AvgByYear.count.toInt)
 
     // ReviewsWordCount
     // Split using a regular expression that extracts words
@@ -83,13 +106,10 @@ object SpotifyReviews {
         dayofweek(col("input")).as("dayofweek")
       )
 
-    val NewDS = NewDF.withColumn("Rating",functions.lit(1))
-    val NewDS2 = NewDS.withColumn("Total_thumbsup",functions.lit(1))
+    val NewDS = NewDF.withColumn("rating",functions.lit(1))
+    val NewDS2 = NewDS.withColumn("total_likes",functions.lit(1))
 
     //Decision Tree Algorithm
-    val SpotifyAnalysis = new StructType()
-      .add("label", DoubleType, nullable = true)
-      .add("features_raw", DoubleType, nullable = true)
 
     import spark.implicits._
     val assembler = new VectorAssembler().
@@ -115,7 +135,7 @@ object SpotifyReviews {
       val model = DTR.fit(trainingDF)
 
       // Now see if we can predict values in our test data.
-      // Generate predictions using our linear regression model for all features in our
+      // Generate predictions using our Decision Tree model for all features in our
       // test dataframe:
       val fullPredictions = model.transform(testDF).cache()
 
