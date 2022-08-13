@@ -113,10 +113,10 @@ object SpotifyReviews {
 
     import spark.implicits._
     val assembler = new VectorAssembler().
-      setInputCols(Array("dayofweek", "dayofmonth", "year", "month", "Total_thumbsup")).
+      setInputCols(Array("dayofweek", "dayofmonth", "year", "month", "total_likes")).
       setOutputCol("features")
     val df = assembler.transform(NewDS2)
-      .select("Rating","features")
+      .select("rating","features")
 
     val results: List[Double] = List(0.4, 0.5, 0.6)
     for (x <- results) {
@@ -129,7 +129,7 @@ object SpotifyReviews {
       // Now create our DecisionTree model
       val DTR = new DecisionTreeRegressor()
         .setFeaturesCol("features")
-        .setLabelCol("Rating")
+        .setLabelCol("rating")
 
       // Train the model using our training data
       val model = DTR.fit(trainingDF)
@@ -142,7 +142,7 @@ object SpotifyReviews {
       // This basically adds a "prediction" column to our testDF dataframe.
 
       // Extract the predictions and the "known" correct labels.
-      val predictionAndLabel = fullPredictions.select("prediction", "Rating").collect()
+      val predictionAndLabel = fullPredictions.select("prediction", "rating").collect()
 
 
       // Print out the predicted and actual values for each point
